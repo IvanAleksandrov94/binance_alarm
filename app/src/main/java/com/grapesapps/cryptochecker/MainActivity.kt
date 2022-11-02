@@ -28,9 +28,12 @@ import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.gson.Gson
+import com.grapesapps.cryptochecker.models.PriceModel
+import com.grapesapps.cryptochecker.services.CryptoAlarmService
 import com.grapesapps.cryptochecker.ui.theme.CryptoCheckerTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +66,9 @@ class MainActivity : ComponentActivity() {
             val focusManager = LocalFocusManager.current
             var isRunningService by remember { mutableStateOf(isRunning) }
             var cryptoCurrency by rememberSaveable { mutableStateOf(initialCryptoCurrency) }
+
+            var minPrice: String? by rememberSaveable { mutableStateOf("0.5") }
+            var maxPrice: String? by rememberSaveable { mutableStateOf("3.0") }
 
 
             fun getPrice(cryptoCurrency: String, pair: String = "USDT"): PriceModel? {
@@ -99,18 +105,19 @@ class MainActivity : ComponentActivity() {
                     }
                     focusManager.clearFocus()
 
-                    val cryptoCurrencyUpper = cryptoCurrency.uppercase(Locale.getDefault())
-
+                    val cryptoCurrencyUpper = cryptoCurrency.trim().uppercase(Locale.getDefault())
                     val priceModel = getPrice(cryptoCurrencyUpper) ?: throw Exception("Ошибка запроса криптовалюты")
                     val formattedPrice = String.format("%.3f", priceModel.price.toDoubleOrNull())
-
 
                     val intent = Intent(applicationContext, CryptoAlarmService::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                         action = "START_ACTION"
                         putExtra("TITLE_CURRENCY", cryptoCurrencyUpper)
                         putExtra("TITLE_PRICE", "\$$formattedPrice")
+                        putExtra("MIN_PRICE", minPrice)
+                        putExtra("MIN_PRICE", maxPrice)
                     }
+
                     sharedPref.saveCryptoCurrency(cryptoCurrencyUpper)
                     applicationContext.startForegroundService(intent)
                     isRunningService = true
@@ -135,9 +142,10 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.SpaceAround,
+                        verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        Spacer(modifier = Modifier.weight(1f))
                         Box() {
                             Text(
                                 text = "Сервис запущен",
@@ -147,8 +155,49 @@ class MainActivity : ComponentActivity() {
                                 )
                             )
                         }
-
-
+                        Spacer(modifier = Modifier.weight(1f))
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            value = minPrice ?: "",
+                            label = { Text("Если цена меньше чем", style = TextStyle(color = Gray)) },
+                            placeholder = {
+                                Text(
+                                    if (nextBoolean()) "4.345" else {
+                                        "1.3343"
+                                    }, style = TextStyle(color = Gray)
+                                )
+                            },
+                            singleLine = true,
+                            enabled = !isRunningService,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
+                            onValueChange = { newText -> minPrice = newText }
+                        )
+                        OutlinedTextField(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            value = maxPrice ?: "",
+                            label = { Text("Если цена больше чем", style = TextStyle(color = Gray)) },
+                            placeholder = {
+                                Text(
+                                    if (nextBoolean()) "10.775" else {
+                                        "3.9843"
+                                    }, style = TextStyle(color = Gray)
+                                )
+                            },
+                            singleLine = true,
+                            enabled = !isRunningService,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Next,
+                                keyboardType = KeyboardType.Number
+                            ),
+                            onValueChange = { newText -> maxPrice = newText }
+                        )
                         OutlinedTextField(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -174,9 +223,11 @@ class MainActivity : ComponentActivity() {
                             ),
                             onValueChange = { newText -> cryptoCurrency = newText }
                         )
+                        Spacer(modifier = Modifier.weight(1f))
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = 20.dp)
+                                .padding(bottom = 30.dp)
                         ) {
                             OutlinedButton(
                                 onClick = {
