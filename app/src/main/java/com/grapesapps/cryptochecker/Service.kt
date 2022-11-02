@@ -44,7 +44,7 @@ class CryptoAlarmService : Service() {
                 try {
                     val priceModel = gson.fromJson(response.body?.string(), PriceModel::class.java)
                     val formattedPrice = String.format("%.3f", priceModel.price.toDoubleOrNull())
-                    val notificationTitle = "$cryptoCurrency · $formattedPrice"
+                    val notificationTitle = "$cryptoCurrency · \$$formattedPrice"
                     val locale = Locale.getDefault()
 
                     val urlBinance =
@@ -141,7 +141,7 @@ class CryptoAlarmService : Service() {
         startForeground(1, notification)
         val timer = Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate({
             getPriceInService(currency!!)
-        }, 0, 10, TimeUnit.SECONDS)
+        }, 0, 300, TimeUnit.SECONDS)
 
         return START_NOT_STICKY
     }
