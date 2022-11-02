@@ -61,7 +61,6 @@ class CryptoAlarmService : Service() {
                     val priceModel = gson.fromJson(response.body?.string(), PriceModel::class.java)
                     val doublePriceOrNull = priceModel.price.toDoubleOrNull()
                     val formattedPrice = String.format("%.3f", doublePriceOrNull)
-                    val notificationTitle = "$cryptoCurrency · \$$formattedPrice"
                     val locale = Locale.getDefault()
 
                     val urlBinance =
@@ -78,7 +77,8 @@ class CryptoAlarmService : Service() {
                         PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
                     )
                     val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle(notificationTitle)
+                        .setContentTitle("\$$formattedPrice")
+                        .setSubText(cryptoCurrency)
                         .setSmallIcon(R.drawable.notification_icon)
                         .setSilent(true)
                         .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
@@ -136,8 +136,6 @@ class CryptoAlarmService : Service() {
         val minPrice = intent.getStringExtra(MIN_PRICE)
         val maxPrice = intent.getStringExtra(MAX_PRICE)
 
-        val notificationTitle = "$currency · $price"
-
         val notificationIntent = Intent(this, MainActivity::class.java)
         val notificationPendingIntent = PendingIntent.getActivity(
             this,
@@ -161,7 +159,8 @@ class CryptoAlarmService : Service() {
         createNotificationChannel(CHANNEL_ID, "Binance Service: $currency")
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(notificationTitle ?: "?")
+            .setContentTitle("\$$price")
+            .setSubText(currency)
             .setSmallIcon(R.drawable.notification_icon)
             .setSilent(true)
             .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
