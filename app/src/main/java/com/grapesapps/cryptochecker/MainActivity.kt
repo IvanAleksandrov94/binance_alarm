@@ -1,14 +1,18 @@
 package com.grapesapps.cryptochecker
 
+import android.Manifest.permission.POST_NOTIFICATIONS
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.StrictMode
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -31,10 +35,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.PermissionChecker
 import com.google.gson.Gson
 import com.grapesapps.cryptochecker.models.PriceModel
 import com.grapesapps.cryptochecker.services.CryptoAlarmService
 import com.grapesapps.cryptochecker.ui.theme.CryptoCheckerTheme
+import com.grapesapps.cryptochecker.utils.baseUrlV3
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,7 +59,21 @@ class MainActivity : ComponentActivity() {
             ?.map { it.service.className }
             ?.contains(serviceClass.name) ?: false
 
-
+    private val requestPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                // Permission is granted. Continue the action or workflow in your
+                // app.
+            } else {
+                // Explain to the user that the feature is unavailable because the
+                // feature requires a permission that the user has denied. At the
+                // same time, respect the user's decision. Don't link to system
+                // settings in an effort to convince the user to change their
+                // decision.
+            }
+        }
     @SuppressLint("UnusedMaterialScaffoldPaddingParameter")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +81,23 @@ class MainActivity : ComponentActivity() {
         StrictMode.setThreadPolicy(policy)
         val sharedPref = SharedPrefManager(applicationContext)
         val isRunning = this.isServiceRunning(CryptoAlarmService::class.java)
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(this, POST_NOTIFICATIONS) != PermissionChecker.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(POST_NOTIFICATIONS);
+
+            } else {
+                //permission already granted
+
+            }
+        }
+//        try {
+//            val filename = "logcat_${System.currentTimeMillis()}.txt"
+//            val outputFile = File(this.externalCacheDir, filename)
+//            Runtime.getRuntime().exec("logcat -f ${outputFile.absolutePath}")
+//        } catch (e: Exception) {
+//            //-
+//        }
 
         setContent {
             val initialCryptoCurrency: String = sharedPref.getCryptoCurrency() ?: "TWT"

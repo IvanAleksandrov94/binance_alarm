@@ -57,6 +57,7 @@ class AlertBinanceService : Service() {
             .setContentTitle(title ?: "?")
             .setSmallIcon(R.drawable.notification_icon)
             .setSilent(false)
+            .setOngoing(true)
             .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
             .setVibrate(LongArray(0))
 //            .setContentIntent(notificationPendingIntent)

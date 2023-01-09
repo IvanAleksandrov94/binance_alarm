@@ -9,13 +9,19 @@ import android.os.*
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.work.*
 import com.google.gson.Gson
 import com.grapesapps.cryptochecker.*
+import com.grapesapps.cryptochecker.R
 import com.grapesapps.cryptochecker.models.PriceModel
+import com.grapesapps.cryptochecker.utils.DateUtils
+import com.grapesapps.cryptochecker.utils.baseUrlV3
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.util.*
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 
@@ -34,6 +40,7 @@ class CryptoAlarmService : Service() {
     }
 
     private lateinit var sharedPref: SharedPrefManager
+    private lateinit var client: OkHttpClient
     private val binder: Binder = CryptoAlarmBinder()
 
 
@@ -50,54 +57,109 @@ class CryptoAlarmService : Service() {
         pair: String = "USDT",
         minPrice: Double?,
         maxPrice: Double?,
-    ) {
+    ): Boolean {
         val url: String = baseUrlV3 + "ticker/price?symbol=$cryptoCurrency$pair"
         val requestBinance = Request.Builder().url(url).build()
 
-        OkHttpClient().newCall(requestBinance).execute().use { response ->
-            if (response.isSuccessful) {
-                val gson = Gson()
-                try {
-                    val priceModel = gson.fromJson(response.body?.string(), PriceModel::class.java)
-                    val doublePriceOrNull = priceModel.price.toDoubleOrNull()
-                    val formattedPrice = String.format("%.3f", doublePriceOrNull)
-                    val locale = Locale.getDefault()
+        try {
+            val response = client.newCall(requestBinance).execute()
+            val gson = Gson()
+            val priceModel = gson.fromJson(response.body?.string(), PriceModel::class.java)
+            val doublePriceOrNull = priceModel.price.toDoubleOrNull()
+            val formattedPrice = String.format("%.3f", doublePriceOrNull)
+            val locale = Locale.getDefault()
 
-                    val urlBinance =
-                        "https://www.binance.com/${locale.country.lowercase(locale)}/trade/$cryptoCurrency" + "_USDT?theme=dark&type=spot"
+            val urlBinance =
+                "https://www.binance.com/${locale.country.lowercase(locale)}/trade/$cryptoCurrency" + "_USDT?theme=dark&type=spot"
 
-                    val notificationIntent = Intent(
-                        Intent.ACTION_VIEW,
-                        Uri.parse(urlBinance)
-                    )
-                    val pendingIntent = PendingIntent.getActivity(
-                        this,
-                        0,
-                        notificationIntent,
-                        PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                    val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-                        .setContentTitle("\$$formattedPrice")
-                        .setSubText(cryptoCurrency)
-                        .setSmallIcon(R.drawable.notification_icon)
-                        .setSilent(true)
-                        .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
-                        .setVibrate(LongArray(0))
-                        .setContentIntent(pendingIntent)
-                        .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
-                        .build()
-                    val mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-                    mNotificationManager.notify(1, notification)
+            val notificationIntent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse(urlBinance)
+            )
+            val pendingIntent = PendingIntent.getActivity(
+                this,
+                0,
+                notificationIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("\$$formattedPrice")
+                .setSubText(cryptoCurrency)
+                .setSmallIcon(R.drawable.notification_icon)
+                .setSilent(true)
+                .setOngoing(true)
+                .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
+                .setVibrate(LongArray(0))
+                .setContentIntent(pendingIntent)
+                .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+                .build()
+            val mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            mNotificationManager.notify(1, notification)
+          //  Log.i("GetPriceInService", "${DateUtils.convertToDate(System.currentTimeMillis())}: END REQUEST UPDATED NOTIFICATION")
 //                    when {
 //                        doublePriceOrNull == null -> return
 //                        (maxPrice != null) && doublePriceOrNull > maxPrice -> startAlarmService("$cryptoCurrency > $3.0")
 //                        (minPrice != null) && doublePriceOrNull < minPrice -> startAlarmService("$cryptoCurrency < $1.0")
 //                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Update notification error: ${e.message}")
-                }
-            }
+            return true
+        } catch (e: IOException) {
+            Log.e("GetPriceInService", "${DateUtils.convertToDate(System.currentTimeMillis())}: ${e.message}")
+            return false
+        } catch (e: Exception) {
+            Log.e("GetPriceInService", "${DateUtils.convertToDate(System.currentTimeMillis())}: ${e.message}")
+            return false
         }
+
+
+//
+//        client.newCall(requestBinance).execute().use { response ->
+//            if (response.isSuccessful) {
+//                val gson = Gson()
+//                try {
+//                    val priceModel = gson.fromJson(response.body?.string(), PriceModel::class.java)
+//                    val doublePriceOrNull = priceModel.price.toDoubleOrNull()
+//                    val formattedPrice = String.format("%.3f", doublePriceOrNull)
+//                    val locale = Locale.getDefault()
+//
+//                    val urlBinance =
+//                        "https://www.binance.com/${locale.country.lowercase(locale)}/trade/$cryptoCurrency" + "_USDT?theme=dark&type=spot"
+//
+//                    val notificationIntent = Intent(
+//                        Intent.ACTION_VIEW,
+//                        Uri.parse(urlBinance)
+//                    )
+//                    val pendingIntent = PendingIntent.getActivity(
+//                        this,
+//                        0,
+//                        notificationIntent,
+//                        PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+//                    )
+//                    val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+//                        .setContentTitle("\$$formattedPrice")
+//                        .setSubText(cryptoCurrency)
+//                        .setSmallIcon(R.drawable.notification_icon)
+//                        .setSilent(true)
+//                        .setDefaults(Notification.DEFAULT_LIGHTS or Notification.DEFAULT_SOUND)
+//                        .setVibrate(LongArray(0))
+//                        .setContentIntent(pendingIntent)
+//                        .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+//                        .build()
+//                    val mNotificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+//                    mNotificationManager.notify(1, notification)
+////                    when {
+////                        doublePriceOrNull == null -> return
+////                        (maxPrice != null) && doublePriceOrNull > maxPrice -> startAlarmService("$cryptoCurrency > $3.0")
+////                        (minPrice != null) && doublePriceOrNull < minPrice -> startAlarmService("$cryptoCurrency < $1.0")
+////                    }
+//                    return true
+//                } catch (e: Exception) {
+//                    Log.e(TAG, "Update notification error: ${e.message}")
+//                    return false
+//                }
+//            } else {
+//                return false
+//            }
+//        }
     }
 
 
@@ -113,6 +175,11 @@ class CryptoAlarmService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        client = OkHttpClient()
+            .newBuilder()
+            .callTimeout(5, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(false)
+            .build()
         sharedPref = SharedPrefManager(applicationContext)
     }
 
@@ -130,9 +197,12 @@ class CryptoAlarmService : Service() {
             wakeLock.release()
             return START_STICKY
         }
+
+        val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
+
+
         val currency = intent.getStringExtra(NOTIFICATION_TITLE_CURRENCY)
         val price = intent.getStringExtra(NOTIFICATION_TITLE_PRICE)
-
         val minPrice = intent.getStringExtra(MIN_PRICE)
         val maxPrice = intent.getStringExtra(MAX_PRICE)
 
@@ -176,15 +246,37 @@ class CryptoAlarmService : Service() {
 
         startForeground(1, notification)
 
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate({
+
+
+        executor.scheduleAtFixedRate({
             if (currency != null) {
-                getPriceInService(
+                Log.i("GetPriceInService", "${DateUtils.convertToDate(System.currentTimeMillis())}: START REQUEST")
+                val isSuccess = getPriceInService(
                     cryptoCurrency = currency,
                     minPrice = minPrice?.toDoubleOrNull(),
                     maxPrice = maxPrice?.toDoubleOrNull(),
                 )
+                Log.i(
+                    "GetPriceInService",
+                    "${DateUtils.convertToDate(System.currentTimeMillis())}: END REQUEST IS SUCCESS - $isSuccess"
+                )
+
+//                if (!isSuccess) {
+//                    executor.shutdownNow()
+//                    val networkConstraints = Constraints.Builder()
+//                        .setRequiredNetworkType(NetworkType.CONNECTED)
+//                        .build()
+//
+//                    val requestPriceWorkBuilder = OneTimeWorkRequestBuilder<RequestWorker>()
+//                        .setConstraints(networkConstraints)
+//                        .setInitialDelay(10, TimeUnit.SECONDS)
+//                        .build()
+//
+//                    WorkManager.getInstance(applicationContext).enqueue(requestPriceWorkBuilder)
+//
+//                }
             }
-        }, 0, 300, TimeUnit.SECONDS)
+        }, 0, 1800, TimeUnit.SECONDS)
 
         return START_NOT_STICKY
     }
